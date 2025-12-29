@@ -85,6 +85,14 @@ const App: React.FC = () => {
     loadHistory();
   }, [clientId, cloudSettings]);
 
+  const resetWorkspace = () => {
+    setClientId('');
+    setPreviewUrl(null);
+    setEmailText('');
+    setState({ loading: false, error: null, result: null });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleGenerate = async () => {
     if (inputMode === 'image' && !previewUrl) {
       setState(s => ({...s, error: "Please upload an email screenshot."}));
@@ -101,7 +109,7 @@ const App: React.FC = () => {
       const inputData = inputMode === 'image' ? { image: previewUrl! } : { text: emailText };
       const result = await generateInsuranceReply(inputData, clientId, clientHistory, playbook);
       
-      // Auto-set Client ID if it was empty
+      const finalClientId = clientId || result.extractedClientName;
       if (!clientId && result.extractedClientName) {
         setClientId(result.extractedClientName);
       }
@@ -111,8 +119,6 @@ const App: React.FC = () => {
         summary: result.summary,
         policyNumber: result.extractedPolicyNumber || undefined,
       };
-
-      const finalClientId = clientId || result.extractedClientName;
 
       if (cloudSettings.enabled) {
         try {
@@ -156,12 +162,18 @@ const App: React.FC = () => {
       <nav className="bg-indigo-900 text-white px-6 py-4 shadow-md flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center space-x-3">
           <div className="bg-yellow-400 p-1.5 rounded text-indigo-900 font-black text-xs">ARAG</div>
-          <h1 className="text-lg font-bold tracking-tight">Agent Copilot <span className="text-indigo-300 font-normal">v3.0</span></h1>
+          <h1 className="text-lg font-bold tracking-tight">Agent Copilot <span className="text-indigo-300 font-normal">v3.1</span></h1>
         </div>
-        <div className="flex items-center space-x-3">
-          <button onClick={() => setIsCloudSettingsOpen(true)} className="flex items-center space-x-2 px-4 py-2 rounded-full text-[10px] font-black bg-indigo-800 text-indigo-100 border border-indigo-700">
-            <span>{cloudSettings.enabled ? 'CLOUD SYNC ON' : 'LOCAL SYNC'}</span>
+        <div className="flex items-center space-x-4">
+          <button 
+            onClick={resetWorkspace}
+            className="flex items-center space-x-2 px-4 py-2 rounded-full text-[10px] font-black bg-white/10 hover:bg-white/20 transition-all border border-white/10"
+            title="Full Workspace Reset"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <span>NEW THREAD</span>
           </button>
+          <div className="h-4 w-px bg-white/20"></div>
           <button onClick={() => setIsTrainingOpen(!isTrainingOpen)} className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${isTrainingOpen ? 'bg-yellow-400 text-indigo-900' : 'bg-indigo-800 text-indigo-100'}`}>PLAYBOOK</button>
         </div>
       </nav>
@@ -196,6 +208,7 @@ const App: React.FC = () => {
                   )}
                   <input 
                     type="file" 
+                    ref={fileInputRef}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
@@ -238,17 +251,26 @@ const App: React.FC = () => {
                 <svg className="h-10 w-10 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">Ready to Analyze</h3>
-              <p className="text-slate-500 max-w-sm mb-8">AI will extract the name and policy number automatically to fetch relevant history.</p>
+              <p className="text-slate-500 max-w-sm mb-8 text-sm leading-relaxed">AI will extract the name and policy number automatically to fetch relevant history and draft bilingual replies.</p>
               
-              {state.error && <div className="mb-6 p-3 bg-red-50 text-red-600 text-[10px] font-black rounded-lg border border-red-100">{state.error}</div>}
+              {state.error && <div className="mb-6 p-3 bg-red-50 text-red-600 text-[10px] font-black rounded-lg border border-red-100 animate-in shake duration-300">{state.error}</div>}
 
-              <button 
-                onClick={handleGenerate}
-                disabled={state.loading}
-                className="px-12 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {state.loading ? 'EXTRACTING...' : 'RUN CO-PILOT'}
-              </button>
+              <div className="flex items-center space-x-4">
+                <button 
+                  onClick={handleGenerate}
+                  disabled={state.loading}
+                  className="px-12 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {state.loading ? 'ANALYZING...' : 'RUN CO-PILOT'}
+                </button>
+                <button 
+                  onClick={resetWorkspace}
+                  className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-slate-200 hover:text-slate-600 transition-all"
+                  title="Clear All Inputs"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-6 animate-in slide-in-from-bottom-8 duration-500">
@@ -264,34 +286,49 @@ const App: React.FC = () => {
                     <p className="text-sm font-bold">{state.result.extractedPolicyNumber || '⚠️ MISSING - REQUESTED'}</p>
                   </div>
                 </div>
-                <div className="bg-emerald-800 px-3 py-1 rounded-full text-[10px] font-black border border-emerald-700">AUTO-MAPPED</div>
+                <div className="bg-emerald-800 px-3 py-1 rounded-full text-[10px] font-black border border-emerald-700">MAPPED</div>
               </div>
 
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Internal Analysis</h3>
-                <div className="bg-slate-50 p-4 rounded-xl text-slate-700 italic border-l-4 border-indigo-400">{state.result.summary}</div>
+                <div className="bg-slate-50 p-4 rounded-xl text-slate-700 italic border-l-4 border-indigo-400 shadow-inner">{state.result.summary}</div>
               </div>
 
               <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                 <div className="bg-indigo-900 text-white px-6 py-4 flex justify-between items-center">
                   <div className="flex bg-indigo-950 p-1 rounded-lg">
-                    <button onClick={() => setActiveLang('en')} className={`px-4 py-1.5 rounded-md text-xs font-black transition-all ${activeLang === 'en' ? 'bg-indigo-600' : 'text-indigo-400'}`}>EN</button>
-                    <button onClick={() => setActiveLang('de')} className={`px-4 py-1.5 rounded-md text-xs font-black transition-all ${activeLang === 'de' ? 'bg-indigo-600' : 'text-indigo-400'}`}>DE</button>
+                    <button onClick={() => setActiveLang('en')} className={`px-4 py-1.5 rounded-md text-xs font-black transition-all ${activeLang === 'en' ? 'bg-indigo-600 shadow-md' : 'text-indigo-400 hover:text-indigo-200'}`}>EN</button>
+                    <button onClick={() => setActiveLang('de')} className={`px-4 py-1.5 rounded-md text-xs font-black transition-all ${activeLang === 'de' ? 'bg-indigo-600 shadow-md' : 'text-indigo-400 hover:text-indigo-200'}`}>DE</button>
                   </div>
                   <button 
-                    onClick={() => { navigator.clipboard.writeText(activeLang === 'en' ? state.result!.replyEnglish : state.result!.replyGerman); alert("Copied!"); }}
-                    className="text-xs bg-indigo-600 px-4 py-1.5 rounded-lg font-bold"
+                    onClick={() => { navigator.clipboard.writeText(activeLang === 'en' ? state.result!.replyEnglish : state.result!.replyGerman); alert("Draft Copied!"); }}
+                    className="text-xs bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg font-bold transition-all shadow-md active:scale-95"
                   >
-                    COPY REPLY
+                    COPY {activeLang.toUpperCase()} DRAFT
                   </button>
                 </div>
                 <textarea 
                   value={activeLang === 'en' ? state.result.replyEnglish : state.result.replyGerman}
                   readOnly
-                  className="w-full h-[350px] p-8 font-mono text-sm text-slate-800 outline-none resize-none"
+                  className="w-full h-[350px] p-8 font-mono text-sm text-slate-800 outline-none resize-none border-none leading-relaxed"
                 />
-                <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end">
-                  <button onClick={() => setState({loading: false, error: null, result: null})} className="text-xs font-bold text-slate-400 hover:text-slate-600">NEW ANALYSIS</button>
+                <div className="bg-slate-50 px-6 py-6 border-t border-slate-100 flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-slate-400 italic">Work completed. Ready for the next task?</p>
+                  <div className="flex space-x-4">
+                    <button 
+                      onClick={() => setState({loading: false, error: null, result: null})} 
+                      className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                    >
+                      EDIT DRAFT
+                    </button>
+                    <button 
+                      onClick={resetWorkspace}
+                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs shadow-lg hover:bg-indigo-700 transition-all active:scale-95 flex items-center"
+                    >
+                      <svg className="h-3.5 w-3.5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                      START NEXT CASE
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
