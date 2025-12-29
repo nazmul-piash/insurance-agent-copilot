@@ -6,7 +6,8 @@ export const generateInsuranceReply = async (
   input: { image?: string; text?: string },
   clientId: string,
   history: InteractionSummary[],
-  playbook: string
+  playbookText: string,
+  playbookPdf?: string // Base64 string of the PDF
 ): Promise<GenerationResult> => {
   const apiKey = "AIzaSyB8wvWcM1hekD7VctwdJnR-BPVO4eLgrGY";
   const ai = new GoogleGenAI({ apiKey });
@@ -17,38 +18,40 @@ export const generateInsuranceReply = async (
 
   const systemInstruction = `
 Role: You are an expert Insurance Agent Assistant for ARAG.
-Objective: Analyze the provided email (either text or screenshot), extract core data, and draft bilingual replies.
+Objective: Analyze the provided email, extract core data, and draft bilingual replies strictly following the provided AGENT PLAYBOOK.
+
+KNOWLEDGE SOURCES:
+1. ATTACHED PDF: This is your primary source of truth for business rules, policy details, and tone.
+2. MANUAL PLAYBOOK: Supplementary rules provided by the agent.
+3. STORED MEMORY: Historical context for this specific client.
 
 Task 1: Structured Extraction
-- Extract the Client's Full Name.
-- Extract the Policy Number (usually a string of numbers/letters).
+- Extract the Client's Full Name and Policy Number.
 - Identify the core request and emotional tone.
 
-Task 2: Policy Handling
-- IMPORTANT: If a Policy Number is NOT found in the input, you MUST include a polite request asking the client to provide their policy number for faster processing in both language drafts.
-- If multiple policies are mentioned, address the primary one but acknowledge the others.
+Task 2: Knowledge Synthesis
+- Use the attached PDF and Manual Playbook to determine the correct insurance response.
+- If a Policy Number is NOT found, politely ask for it in both language drafts.
 
-Task 3: Memory Integration
-- Use STORED MEMORY to reference past issues. Note that clients may have multiple insurance types (Home, Car, Liability).
-
-Task 4: Response Generation
+Task 3: Response Generation
 - Draft professional, empathetic replies in English (replyEnglish) and German (replyGerman).
-- Follow the AGENT PLAYBOOK.
+- Ensure the German translation is natural and uses formal "Sie" address.
 
-AGENT PLAYBOOK:
-${playbook}
+MANUAL PLAYBOOK RULES:
+${playbookText}
 `;
 
   const prompt = `
-CLIENT ID PROVIDED BY AGENT: ${clientId || "Not provided (Please extract from input)"}
+CLIENT ID PROVIDED BY AGENT: ${clientId || "Not provided"}
 STORED MEMORY:
 ${storedMemory}
 
-Analyze the attached input (Text/Image) and return the analysis and drafts in JSON.
+Analyze the email input and generate the JSON response.
 `;
 
   const parts: any[] = [{ text: prompt }];
   
+  // Add the Email Content (Image or Text)
   if (input.image) {
     parts.push({
       inlineData: {
@@ -60,6 +63,16 @@ Analyze the attached input (Text/Image) and return the analysis and drafts in JS
   
   if (input.text) {
     parts.push({ text: `EMAIL TEXT CONTENT: \n${input.text}` });
+  }
+
+  // Add the PDF Playbook if provided
+  if (playbookPdf) {
+    parts.push({
+      inlineData: {
+        mimeType: "application/pdf",
+        data: playbookPdf.split(',')[1] || playbookPdf,
+      },
+    });
   }
 
   try {
@@ -78,8 +91,7 @@ Analyze the attached input (Text/Image) and return the analysis and drafts in JS
             extractedClientName: { type: Type.STRING },
             extractedPolicyNumber: { 
               type: Type.STRING, 
-              nullable: true,
-              description: "The extracted policy number if found, otherwise null."
+              nullable: true
             },
           },
           required: ["summary", "replyEnglish", "replyGerman", "extractedClientName"],
