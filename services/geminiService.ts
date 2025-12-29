@@ -9,7 +9,7 @@ export const generateInsuranceReply = async (
   playbookText: string,
   playbookPdf?: string // Base64 string of the PDF
 ): Promise<GenerationResult> => {
-  const apiKey = "AIzaSyB8wvWcM1hekD7VctwdJnR-BPVO4eLgrGY";
+  const apiKey = "AIzaSyD9j_ejWarkqa1P0sxu9kzwp871PRAn0AE";
   const ai = new GoogleGenAI({ apiKey });
 
   const storedMemory = history.length > 0 
