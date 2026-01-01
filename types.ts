@@ -11,7 +11,9 @@ export interface ClientData {
 }
 
 export interface GenerationResult {
-  summary: string;
+  analysis: string;
+  recommendation: string;
+  nextSteps: string;
   replyEnglish: string;
   replyGerman: string;
   extractedClientName: string;

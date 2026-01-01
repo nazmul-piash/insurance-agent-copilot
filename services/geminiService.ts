@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { InteractionSummary, GenerationResult } from "../types";
 
@@ -7,48 +6,63 @@ export const generateInsuranceReply = async (
   clientId: string,
   history: InteractionSummary[],
   playbookText: string,
-  playbookPdf?: string // Base64 string of the PDF
+  playbookPdf?: string 
 ): Promise<GenerationResult> => {
-  // Always create a new instance right before the call to ensure the latest API key is used
-  // Create a new GoogleGenAI instance right before making an API call to ensure it always uses the most up-to-date API key from the dialog.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Use the system-provided API key from environment variables.
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("KEY_RESET_REQUIRED");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   const storedMemory = history.length > 0 
     ? history.map(h => `[Date: ${h.date}] [Policy: ${h.policyNumber || 'Unknown'}] Summary: ${h.summary}`).join('\n')
     : "No previous interaction history found.";
 
   const systemInstruction = `
-Role: You are an expert Insurance Agent Assistant for ARAG.
-Objective: Analyze the provided email, extract core data, and draft bilingual replies strictly following the provided AGENT PLAYBOOK.
+ROLE: You are "InsurBot", an expert Insurance Agent Assistant for ARAG.
+OBJECTIVE: Analyze the provided email screenshot or text, extract core data, and draft bilingual replies strictly following the provided AGENT PLAYBOOK and attached knowledge.
 
-KNOWLEDGE SOURCES:
-1. ATTACHED PDF: This is your primary source of truth for business rules, policy details, and tone.
-2. MANUAL PLAYBOOK: Supplementary rules provided by the agent.
-3. STORED MEMORY: Historical context for this specific client.
+MISSION:
+- Simplify complex insurance jargon into clear, actionable advice.
+- Assist agents in drafting high-quality, compliant responses.
+- Analyze client sentiments and provide tailored recommendations.
 
-Task 1: Structured Extraction
-- Extract the Client's Full Name and Policy Number.
-- Identify the core request and emotional tone.
+KNOWLEDGE BASES:
+1. ATTACHED PDF: Primary source for official policy terms and conditions.
+2. AGENT PLAYBOOK (Text): Custom rules and specific instructions provided by the human agent.
+3. CLIENT HISTORY: Contextual data from previous interactions.
 
-Task 2: Knowledge Synthesis
-- Use the attached PDF and Manual Playbook to determine the correct insurance response.
-- If a Policy Number is NOT found, politely ask for it in both language drafts.
+OPERATIONAL GUIDELINES:
+- TONE: Professional, warm, and reassuring.
+- ACCURACY: Stick strictly to the provided knowledge bases. If information is missing (like a policy number), ask for it politely.
+- BILINGUAL: Always provide drafts in both English and German (using formal "Sie").
 
-Task 3: Response Generation
-- Draft professional, empathetic replies in English (replyEnglish) and German (replyGerman).
-- Ensure the German translation is natural and uses formal "Sie" address.
+OUTPUT FORMAT (JSON):
+{
+  "analysis": "Brief analysis of the client's needs and emotional state.",
+  "recommendation": "The specific policy-based advice or action suggested.",
+  "nextSteps": "Bulleted list of actions for the agent to take.",
+  "replyEnglish": "Full professional draft in English.",
+  "replyGerman": "Full professional draft in German (Formal).",
+  "extractedClientName": "Name of the client.",
+  "extractedPolicyNumber": "Policy number if found, otherwise null."
+}
 
-MANUAL PLAYBOOK RULES:
-${playbookText}
-`;
+AGENT PLAYBOOK INPUT:
+${playbookText}`;
 
   const prompt = `
-CLIENT ID PROVIDED BY AGENT: ${clientId || "Not provided"}
+CLIENT ID PROVIDED: ${clientId || "Not provided"}
 STORED MEMORY:
 ${storedMemory}
 
-Analyze the email input and generate the JSON response.
-`;
+INPUT DATA:
+${input.text ? `EMAIL CONTENT: ${input.text}` : "IMAGE CONTENT ATTACHED"}
+
+Analyze and generate the response following the InsurBot v4.2 protocol.`;
 
   const parts: any[] = [{ text: prompt }];
   
@@ -61,10 +75,6 @@ Analyze the email input and generate the JSON response.
     });
   }
   
-  if (input.text) {
-    parts.push({ text: `EMAIL TEXT CONTENT: \n${input.text}` });
-  }
-
   if (playbookPdf) {
     parts.push({
       inlineData: {
@@ -75,9 +85,8 @@ Analyze the email input and generate the JSON response.
   }
 
   try {
-    // Upgrading to gemini-3-pro-preview for complex reasoning tasks (PDF analysis + bilingual drafting)
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: { parts },
       config: {
         systemInstruction,
@@ -85,32 +94,28 @@ Analyze the email input and generate the JSON response.
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            summary: { type: Type.STRING },
+            analysis: { type: Type.STRING },
+            recommendation: { type: Type.STRING },
+            nextSteps: { type: Type.STRING },
             replyEnglish: { type: Type.STRING },
             replyGerman: { type: Type.STRING },
             extractedClientName: { type: Type.STRING },
-            extractedPolicyNumber: { 
-              type: Type.STRING
-            },
+            extractedPolicyNumber: { type: Type.STRING, nullable: true },
           },
-          required: ["summary", "replyEnglish", "replyGerman", "extractedClientName"],
+          required: ["analysis", "recommendation", "nextSteps", "replyEnglish", "replyGerman", "extractedClientName"],
         },
       },
     });
 
-    // response.text is a property, not a method.
     const text = response.text;
-    if (!text) throw new Error("The AI returned an empty response.");
+    if (!text) throw new Error("Empty response from AI.");
     
     return JSON.parse(text) as GenerationResult;
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    
-    // Check if the error indicates a missing or invalid entity (often related to key selection)
-    if (error.message?.includes("Requested entity was not found")) {
+    console.error("API Error:", error);
+    if (error.message?.includes("Requested entity was not found") || error.message?.includes("403") || error.message?.includes("401")) {
       throw new Error("KEY_RESET_REQUIRED");
     }
-    
     throw error;
   }
 };

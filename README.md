@@ -1,20 +1,17 @@
 
-# ARAG Insurance Agent Copilot v2.0
+# ARAG Insurance Agent Copilot v2.5
 
-An AI-powered assistant designed for ARAG agents to automate email analysis and drafting using the **Master System Prompt** workflow.
+An AI-powered assistant designed for ARAG agents to automate email analysis and drafting using a Master System Prompt workflow.
 
-## 🚀 Quick Start (Using your API Key)
+## 🚀 Quick Start
 
 1. **Install Node.js**: Ensure [Node.js](https://nodejs.org/) is installed.
-2. **Environment Variable**: Set your API key in the terminal before starting:
+2. **Launch Application**:
    ```bash
-   export API_KEY="AIzaSyB8wvWcM1hekD7VctwdJnR-BPVO4eLgrGY"
+   npm install
+   npm run dev
    ```
-3. **Run Application**:
-   ```bash
-   npm install -D vite
-   npx vite
-   ```
+3. **API Key**: When the application starts, you will be prompted to select a paid Google Cloud Project API key via the secure selection dialog.
 
 ## ☁️ Cloud Memory (Supabase)
 To share memory across multiple computers:
@@ -25,15 +22,17 @@ To share memory across multiple computers:
      client_id text not null,
      summary text not null,
      date text not null,
+     policy_number text,
      created_at timestamp with time zone default now()
    );
    ```
 2. Enter your **Supabase URL** and **Anon Key** in the **Cloud Settings** (top navbar) of the app.
 
-## 🧠 Master System Prompt Workflow
-- **Task 1: Extraction**: Transcribes screenshot text and identifies tone.
-- **Task 2: Memory**: Cross-references with previous summaries in Cloud/Local storage.
-- **Task 3: Generation**: Drafts empathetic, ARAG-compliant replies based on your **Agent Playbook**.
+## 🧠 Intelligence Workflow
+- **Task 1: Extraction**: Transcribes screenshot text and identifies tone using Gemini Flash.
+- **Task 2: Knowledge Grounding**: Cross-references uploaded PDF handbooks and custom agent rules.
+- **Task 3: Memory**: Recalls previous interactions for consistent client service.
+- **Task 4: Generation**: Drafts empathetic, ARAG-compliant replies in English and German.
 
 ## 📄 License
 Confidential - ARAG Internal Use.
