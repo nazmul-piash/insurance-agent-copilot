@@ -9,7 +9,8 @@ export const generateInsuranceReply = async (
   playbookText: string,
   playbookPdf?: string // Base64 string of the PDF
 ): Promise<GenerationResult> => {
-  // Use the environment variable for security
+  // Always create a new instance right before the call to ensure the latest API key is used
+  // Create a new GoogleGenAI instance right before making an API call to ensure it always uses the most up-to-date API key from the dialog.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const storedMemory = history.length > 0 
@@ -74,8 +75,9 @@ Analyze the email input and generate the JSON response.
   }
 
   try {
+    // Upgrading to gemini-3-pro-preview for complex reasoning tasks (PDF analysis + bilingual drafting)
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: { parts },
       config: {
         systemInstruction,
@@ -88,8 +90,7 @@ Analyze the email input and generate the JSON response.
             replyGerman: { type: Type.STRING },
             extractedClientName: { type: Type.STRING },
             extractedPolicyNumber: { 
-              type: Type.STRING, 
-              nullable: true
+              type: Type.STRING
             },
           },
           required: ["summary", "replyEnglish", "replyGerman", "extractedClientName"],
@@ -97,12 +98,19 @@ Analyze the email input and generate the JSON response.
       },
     });
 
+    // response.text is a property, not a method.
     const text = response.text;
     if (!text) throw new Error("The AI returned an empty response.");
     
     return JSON.parse(text) as GenerationResult;
   } catch (error: any) {
     console.error("Gemini API Error:", error);
+    
+    // Check if the error indicates a missing or invalid entity (often related to key selection)
+    if (error.message?.includes("Requested entity was not found")) {
+      throw new Error("KEY_RESET_REQUIRED");
+    }
+    
     throw error;
   }
 };
