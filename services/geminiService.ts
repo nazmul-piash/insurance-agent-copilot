@@ -9,8 +9,8 @@ export const generateInsuranceReply = async (
   playbookText: string,
   playbookPdf?: string // Base64 string of the PDF
 ): Promise<GenerationResult> => {
-  const apiKey = "AIzaSyD9j_ejWarkqa1P0sxu9kzwp871PRAn0AE";
-  const ai = new GoogleGenAI({ apiKey });
+  // Use the environment variable for security
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const storedMemory = history.length > 0 
     ? history.map(h => `[Date: ${h.date}] [Policy: ${h.policyNumber || 'Unknown'}] Summary: ${h.summary}`).join('\n')
@@ -51,7 +51,6 @@ Analyze the email input and generate the JSON response.
 
   const parts: any[] = [{ text: prompt }];
   
-  // Add the Email Content (Image or Text)
   if (input.image) {
     parts.push({
       inlineData: {
@@ -65,7 +64,6 @@ Analyze the email input and generate the JSON response.
     parts.push({ text: `EMAIL TEXT CONTENT: \n${input.text}` });
   }
 
-  // Add the PDF Playbook if provided
   if (playbookPdf) {
     parts.push({
       inlineData: {
