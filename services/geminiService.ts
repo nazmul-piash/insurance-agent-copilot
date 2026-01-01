@@ -11,6 +11,7 @@ export const generateInsuranceReply = async (
   // Use the system-provided API key from environment variables.
   const apiKey = process.env.API_KEY;
   
+  
   if (!apiKey) {
     throw new Error("KEY_RESET_REQUIRED");
   }
