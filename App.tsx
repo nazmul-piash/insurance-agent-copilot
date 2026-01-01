@@ -33,7 +33,7 @@ export const App: React.FC = () => {
   
   const [cloudSettings, setCloudSettings] = useState<CloudSettings>(() => {
     const saved = localStorage.getItem('arag_cloud_settings_v4');
-    return saved ? JSON.parse(saved) : { supabaseUrl: '', supabaseKey: '', enabled: false };
+    return saved ? JSON.parse(saved) : { supabaseUrl: '', supabaseKey: '', apiKey: '', enabled: false };
   });
 
   const [state, setState] = useState<AnalysisState>({
@@ -48,14 +48,21 @@ export const App: React.FC = () => {
   // API Key Check
   useEffect(() => {
     const checkKey = async () => {
+      // Priority: 1. Manual Key, 2. Env Var, 3. AI Studio Dialog
+      if (cloudSettings.apiKey || process.env.API_KEY) {
+        setHasApiKey(true);
+        return;
+      }
       const aiStudio = (window as any).aistudio;
-      if (typeof aiStudio !== 'undefined' && !process.env.API_KEY) {
+      if (typeof aiStudio !== 'undefined') {
         const selected = await aiStudio.hasSelectedApiKey();
         setHasApiKey(selected);
+      } else {
+        setHasApiKey(false);
       }
     };
     checkKey();
-  }, []);
+  }, [cloudSettings.apiKey]);
 
   // Playbook persistence
   useEffect(() => {
@@ -129,7 +136,8 @@ export const App: React.FC = () => {
         clientId,
         clientHistory,
         playbook,
-        playbookPdf || undefined
+        playbookPdf || undefined,
+        cloudSettings.apiKey
       );
 
       setState({ loading: false, error: null, result: res });
@@ -158,8 +166,9 @@ export const App: React.FC = () => {
               policy_number: res.extractedPolicyNumber || null
             })
           });
-          // Refresh history from cloud
-          setClientId(prev => prev); 
+          // Refresh history from cloud by re-triggering the effect
+          setClientId(prev => prev + ' ');
+          setTimeout(() => setClientId(prev => prev.trim()), 10);
         } else {
           // Save Local
           const updatedHistory = [newHistoryItem, ...clientHistory].slice(0, 10);
@@ -183,9 +192,12 @@ export const App: React.FC = () => {
           <div className="bg-yellow-400 text-indigo-900 p-2 rounded mb-6 font-black text-xs uppercase tracking-widest">Setup Required</div>
           <h2 className="text-3xl font-black mb-4 tracking-tight">API Key Selection</h2>
           <p className="max-w-md text-indigo-200 text-sm mb-10 leading-relaxed">
-            Please select an API key to enable InsurBot intelligence features.
+            Please select an API key or provide one in the Cloud Settings to enable InsurBot intelligence features.
           </p>
-          <button onClick={handleOpenSelectKey} className="px-12 py-4 bg-white text-indigo-900 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all">SELECT API KEY</button>
+          <div className="flex flex-col space-y-4">
+            <button onClick={handleOpenSelectKey} className="px-12 py-4 bg-white text-indigo-900 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all">SELECT API KEY</button>
+            <button onClick={() => setIsCloudSettingsOpen(true)} className="text-xs font-bold text-indigo-300 hover:text-white uppercase tracking-widest">Manual API Key Entry</button>
+          </div>
         </div>
       )}
 
@@ -197,8 +209,8 @@ export const App: React.FC = () => {
           </div>
           <div className="flex space-x-4">
             <button onClick={() => setIsSetupOpen(true)} className="text-xs font-bold text-indigo-300 hover:text-white transition-colors">Guide</button>
-            <button onClick={() => setIsCloudSettingsOpen(true)} className={`text-xs font-bold px-3 py-1 rounded transition-colors ${cloudSettings.enabled ? 'bg-emerald-500/20 text-emerald-300' : 'text-indigo-300 hover:text-white'}`}>
-              {cloudSettings.enabled ? 'Cloud On' : 'Connect Cloud'}
+            <button onClick={() => setIsCloudSettingsOpen(true)} className={`text-xs font-bold px-3 py-1 rounded transition-colors ${cloudSettings.enabled || cloudSettings.apiKey ? 'bg-emerald-500/20 text-emerald-300' : 'text-indigo-300 hover:text-white'}`}>
+              {cloudSettings.enabled || cloudSettings.apiKey ? 'Config Active' : 'Connect Cloud'}
             </button>
             <button onClick={() => setIsTrainingOpen(true)} className="bg-white/10 px-4 py-2 rounded-xl text-xs font-bold border border-white/10">Playbook</button>
           </div>
@@ -356,18 +368,31 @@ export const App: React.FC = () => {
       )}
 
       {isCloudSettingsOpen && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-[250] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-xl rounded-[40px] shadow-3xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
             <div className="bg-indigo-900 p-8 text-white flex justify-between items-center">
-              <h3 className="text-xl font-black uppercase tracking-tight">Cloud Sync Settings</h3>
+              <h3 className="text-xl font-black uppercase tracking-tight">System Settings</h3>
               <button onClick={() => setIsCloudSettingsOpen(false)} className="text-white hover:opacity-70 transition-opacity">
                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-10 space-y-6">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Intelligence Override</label>
+                <input 
+                  type="password" 
+                  value={cloudSettings.apiKey} 
+                  onChange={e => setCloudSettings({...cloudSettings, apiKey: e.target.value})} 
+                  placeholder="Manual Gemini API Key (Overrides Default)" 
+                  className="w-full bg-slate-50 rounded-2xl px-5 py-3 text-sm focus:ring-4 focus:ring-indigo-50 border-transparent outline-none transition-all shadow-inner" 
+                />
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
               <div className="flex items-center justify-between bg-slate-50 p-6 rounded-3xl">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Status</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">SQL Sync Status</p>
                   <p className="font-bold">{cloudSettings.enabled ? 'SQL SYNC ACTIVE' : 'LOCAL ONLY'}</p>
                 </div>
                 <button onClick={() => setCloudSettings({...cloudSettings, enabled: !cloudSettings.enabled})} className={`w-14 h-8 rounded-full transition-all relative p-1 ${cloudSettings.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
@@ -375,8 +400,8 @@ export const App: React.FC = () => {
                 </button>
               </div>
               <div className="space-y-4">
-                <input type="text" value={cloudSettings.supabaseUrl} onChange={e => setCloudSettings({...cloudSettings, supabaseUrl: e.target.value})} placeholder="Supabase Project URL" className="w-full bg-slate-50 rounded-2xl px-5 py-3 text-sm focus:ring-4 focus:ring-indigo-50 border-transparent outline-none transition-all" />
-                <input type="password" value={cloudSettings.supabaseKey} onChange={e => setCloudSettings({...cloudSettings, supabaseKey: e.target.value})} placeholder="Supabase Anon Key" className="w-full bg-slate-50 rounded-2xl px-5 py-3 text-sm focus:ring-4 focus:ring-indigo-50 border-transparent outline-none transition-all" />
+                <input type="text" value={cloudSettings.supabaseUrl} onChange={e => setCloudSettings({...cloudSettings, supabaseUrl: e.target.value})} placeholder="Supabase Project URL" className="w-full bg-slate-50 rounded-2xl px-5 py-3 text-sm focus:ring-4 focus:ring-indigo-50 border-transparent outline-none transition-all shadow-inner" />
+                <input type="password" value={cloudSettings.supabaseKey} onChange={e => setCloudSettings({...cloudSettings, supabaseKey: e.target.value})} placeholder="Supabase Anon Key" className="w-full bg-slate-50 rounded-2xl px-5 py-3 text-sm focus:ring-4 focus:ring-indigo-50 border-transparent outline-none transition-all shadow-inner" />
               </div>
             </div>
             <div className="p-8 bg-slate-50 border-t flex justify-end">

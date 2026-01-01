@@ -29,5 +29,6 @@ export interface AnalysisState {
 export interface CloudSettings {
   supabaseUrl: string;
   supabaseKey: string;
+  apiKey?: string;
   enabled: boolean;
 }
