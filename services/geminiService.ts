@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { InteractionSummary, GenerationResult } from "../types";
 
@@ -6,10 +7,11 @@ export const generateInsuranceReply = async (
   clientId: string,
   history: InteractionSummary[],
   playbookText: string,
-  playbookPdf?: string 
+  playbookPdf?: string,
+  apiKeyOverride?: string
 ): Promise<GenerationResult> => {
-  // Use the system-provided API key from environment variables.
-  const apiKey = process.env.API_KEY;
+  // Use the manually provided key or fallback to the system environment variable.
+  const apiKey = apiKeyOverride || process.env.API_KEY;
   
   if (!apiKey) {
     throw new Error("KEY_RESET_REQUIRED");

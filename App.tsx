@@ -45,10 +45,34 @@ export const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
+  // Clipboard Paste Handler
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      if (inputMode !== 'image') return;
+      
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          if (blob) {
+            const reader = new FileReader();
+            reader.onloadend = () => setPreviewUrl(reader.result as string);
+            reader.readAsDataURL(blob);
+            break; // Process only the first image found
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [inputMode]);
+
   // API Key Check
   useEffect(() => {
     const checkKey = async () => {
-      // Priority: 1. Manual Key, 2. Env Var, 3. AI Studio Dialog
       if (cloudSettings.apiKey || process.env.API_KEY) {
         setHasApiKey(true);
         return;
@@ -149,7 +173,6 @@ export const App: React.FC = () => {
           policyNumber: res.extractedPolicyNumber || undefined,
         };
 
-        // Save to Cloud if enabled
         if (cloudSettings.enabled && cloudSettings.supabaseUrl && cloudSettings.supabaseKey) {
           await fetch(`${cloudSettings.supabaseUrl}/rest/v1/client_memory`, {
             method: 'POST',
@@ -166,11 +189,9 @@ export const App: React.FC = () => {
               policy_number: res.extractedPolicyNumber || null
             })
           });
-          // Refresh history from cloud by re-triggering the effect
           setClientId(prev => prev + ' ');
           setTimeout(() => setClientId(prev => prev.trim()), 10);
         } else {
-          // Save Local
           const updatedHistory = [newHistoryItem, ...clientHistory].slice(0, 10);
           setClientHistory(updatedHistory);
           const key = `arag_memory_v4_${clientId.trim().toLowerCase() || 'anonymous'}`;
@@ -239,9 +260,14 @@ export const App: React.FC = () => {
             {inputMode === 'image' ? (
               <div 
                 onClick={() => fileInputRef.current?.click()} 
-                className="aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-[24px] flex flex-col items-center justify-center cursor-pointer overflow-hidden group hover:border-indigo-400 transition-all"
+                className="aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-[24px] flex flex-col items-center justify-center cursor-pointer overflow-hidden group hover:border-indigo-400 transition-all shadow-inner hover:bg-indigo-50/30"
               >
-                {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover" /> : <div className="text-center p-4 text-[10px] font-black text-slate-400 uppercase">Upload Screenshot</div>}
+                {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover animate-in fade-in" /> : (
+                  <div className="text-center p-4">
+                    <svg className="h-8 w-8 text-slate-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Paste (Ctrl+V) or Click to Upload</p>
+                  </div>
+                )}
                 <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -285,11 +311,11 @@ export const App: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-10 rounded-[40px] border border-slate-200">
+                <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Analysis</h4>
                   <p className="text-sm text-slate-700 leading-relaxed italic border-l-4 border-indigo-600 pl-6">{state.result.analysis}</p>
                 </div>
-                <div className="bg-white p-10 rounded-[40px] border border-slate-200">
+                <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Recommendation</h4>
                   <p className="text-sm text-slate-700 leading-relaxed font-medium">{state.result.recommendation}</p>
                 </div>
@@ -309,10 +335,10 @@ export const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="h-[600px] bg-white border border-slate-200 rounded-[40px] flex flex-col items-center justify-center text-slate-300 p-12 text-center">
+            <div className="h-[600px] bg-white border border-slate-200 rounded-[40px] flex flex-col items-center justify-center text-slate-300 p-12 text-center shadow-sm">
               <svg className="h-16 w-16 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               <h3 className="text-xl font-black text-slate-400 mb-2 tracking-tight uppercase">Ready for Analysis</h3>
-              <p className="max-w-xs text-sm font-medium">Input a case on the left to begin synthesis.</p>
+              <p className="max-w-xs text-sm font-medium">Paste a screenshot or email text to begin synthesis.</p>
             </div>
           )}
         </section>
